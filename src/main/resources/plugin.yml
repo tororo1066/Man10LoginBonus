@@ -1,0 +1,7 @@
+name: Man10LoginBonus
+version: @version@
+main: man10loginbonus.man10loginbonus.MLB
+api-version: 1.16
+
+commands:
+  mlb:
