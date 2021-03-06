@@ -24,9 +24,10 @@ import java.time.ZonedDateTime
 
 class MLB : JavaPlugin(), Listener {
 
-    private val prefix = "[MLB]"
+    private val prefix = "[§dM§aL§eB]§b "
 
     override fun onEnable() {
+        server.logger.info("Man10LoginBonus is Enable!")
         server.pluginManager.registerEvents(this,this)
         getCommand("mlb")?.setExecutor(this)
         saveDefaultConfig()
@@ -54,7 +55,7 @@ class MLB : JavaPlugin(), Listener {
             server.logger.info("ログインボーナスの更新が完了しました")
             Bukkit.broadcastMessage(prefix + "ログインボーナスが更新されました！")
             Bukkit.broadcastMessage(prefix + "入りなおすと取得することができます")
-        },nexttime,86400 * 20)
+        },nexttime.toLong(),86400 * 20)
     }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
@@ -183,8 +184,6 @@ class MLB : JavaPlugin(), Listener {
         if (e.view.title.contains("月のログインボーナス")){
             if (e.clickedInventory == click.inventory)return
             if (e.view.title.contains("月のログインボーナス(設定画面)")){
-
-
                 if (s in 0..1 || s in 9..10 || s in 18..19 || s in 27..28 || s in 36..37 || s in 45..48 || s in 50..53 || s in 7..8 || s in 16..17 || s in 25..26 || s in 34..35 || s in 43..44)e.isCancelled = true
                 if (e.slot == 49)click.closeInventory()
             }else e.isCancelled = true
