@@ -5,6 +5,7 @@ import org.bukkit.Material
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -24,17 +25,17 @@ import java.time.ZonedDateTime
 
 class MLB : JavaPlugin(), Listener {
 
-    private val prefix = "[§dM§aL§eB]§b "
+    private val prefix = "[§dM§aL§eB§f]§b "
 
     override fun onEnable() {
         server.logger.info("Man10LoginBonus is Enable!")
         server.pluginManager.registerEvents(this,this)
         getCommand("mlb")?.setExecutor(this)
         saveDefaultConfig()
-        if (!config.isSet("data"))return
+        if (!config.isList("data"))return
         val next = (ZonedDateTime.now().hour * 3600 + ZonedDateTime.now().minute * 60 + ZonedDateTime.now().second)
         val nexttime = (86400 - next) * 20
-        Bukkit.getScheduler().runTaskTimer(this, Runnable {
+        Bukkit.getScheduler().runTaskLater(this, Runnable {
             val monthed = ZonedDateTime.now().minusHours(1).monthValue
             val month = ZonedDateTime.now().monthValue
             if (monthed != month){
@@ -46,22 +47,34 @@ class MLB : JavaPlugin(), Listener {
             }
             val l = config.getStringList("data")
             for (i in l){
-                val d = i.split(":")[0] + ":" + (i.split(":")[1].toInt() + 1) + ":true"
+                val d = i.split(":")[0] + ":" + (i.split(":")[1].toInt()) + ":true"
                 l.remove(i)
                 l.add(d)
                 config.set("data",l)
             }
             saveConfig()
             server.logger.info("ログインボーナスの更新が完了しました")
+
             Bukkit.broadcastMessage(prefix + "ログインボーナスが更新されました！")
             Bukkit.broadcastMessage(prefix + "入りなおすと取得することができます")
-        },nexttime.toLong(),86400 * 20)
+            Bukkit.broadcastMessage(prefix + "ログインボーナスは/mlb showで見ることができます")
+        },nexttime.toLong())
     }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (sender !is Player)return true
-
+        if (args.isEmpty())return true
         when(args[0]){
+            "help"->{
+                sender.sendMessage("§b===============Man10LoginBonus===============")
+                sender.sendMessage("§b/mlb show 今月のログインボーナスを見ます")
+                if (sender.hasPermission("admin")){
+                    sender.sendMessage("§b/mlb set (month) 指定した月のログインボーナスを変更します")
+                }
+                sender.sendMessage("§bAuthor:tororo_1066")
+                sender.sendMessage("§b===============Man10LoginBonus===============")
+                return true
+            }
             "set"->{
                 if (!sender.hasPermission("admin"))return true
                 if (args.size != 2)return true
@@ -147,9 +160,19 @@ class MLB : JavaPlugin(), Listener {
                 }
                 var c = 0
                 for (i in 0 until 45 step 9) for (j in (i + 2)..(i + 6)){
-                    inv.setItem(j,itemFromBase64(l[c]))
+                    if (config.getStringList("data").find { it.contains("${sender.uniqueId}") }?.split(":")?.get(1)?.toInt() == c){
+                        val item = itemFromBase64(l[c])?.let { ItemStack(it) }
+                        val meta = item?.itemMeta
+                        meta?.addEnchant(Enchantment.ARROW_DAMAGE,0,false)
+                        item?.itemMeta = meta
+                        inv.setItem(j,item)
+                    }else{
+                        inv.setItem(j,itemFromBase64(l[c]))
+                    }
+
                     c++
                 }
+
                 sender.openInventory(inv)
 
 
@@ -203,7 +226,7 @@ class MLB : JavaPlugin(), Listener {
         val find = l.find { it.contains("${e.player.uniqueId}") }!!
         val int = find.split(":")[1].toInt()
         if (!find.split(":")[2].toBoolean())return
-        if (int == 25)return
+        if (int > 24)return
         val month = ZonedDateTime.now().monthValue
         val file = File(dataFolder,"$month.yml")
         if (!file.exists()){
