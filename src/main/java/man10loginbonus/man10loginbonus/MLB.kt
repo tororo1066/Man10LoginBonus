@@ -47,7 +47,7 @@ class MLB : JavaPlugin(), Listener {
             }
             val l = config.getStringList("data")
             for (i in l){
-                val d = i.split(":")[0] + ":" + (i.split(":")[1].toInt()) + ":true"
+                val d = i.split(":")[0] + ":" + (i.split(":")[1].toInt() + 1) + ":true"
                 l.remove(i)
                 l.add(d)
                 config.set("data",l)
