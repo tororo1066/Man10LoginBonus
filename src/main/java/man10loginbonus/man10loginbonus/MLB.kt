@@ -22,48 +22,56 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.lang.NumberFormatException
 import java.time.ZonedDateTime
+import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class MLB : JavaPlugin(), Listener {
 
     private val prefix = "[§dM§aL§eB§f]§b "
+    lateinit var pool : ExecutorService
+    var mode : Boolean = false
 
     override fun onEnable() {
-        server.logger.info("Man10LoginBonus is Enable!")
         server.pluginManager.registerEvents(this,this)
         getCommand("mlb")?.setExecutor(this)
         saveDefaultConfig()
-        if (!config.isList("data"))return
+        val sql = MySQLManager(this,"mlbtestload")
+        if (!sql.connected){
+            server.logger.warning(prefix + "mysqlに接続できなかったのでpluginを停止しました")
+            mode = false
+            return
+        }else mode = true
+        sql.close()
+        server.logger.info("Man10LoginBonus is Enable!")
+        pool = Executors.newCachedThreadPool()
         val next = (ZonedDateTime.now().hour * 3600 + ZonedDateTime.now().minute * 60 + ZonedDateTime.now().second)
         val nexttime = (86400 - next) * 20
         Bukkit.getScheduler().runTaskLater(this, Runnable {
             val monthed = ZonedDateTime.now().minusHours(1).monthValue
             val month = ZonedDateTime.now().monthValue
+            val mysql = MySQLManager(this,"mlbdayload")
             if (monthed != month){
-                val l = config.getStringList("data")
-                for (i in l){
-                    l.remove(i)
-                    config.set("data",l)
-                }
+                mysql.execute("UPDATE man10loginbonus SET day = 0, boolean = 'true';")
+            }else{
+                mysql.execute("UPDATE man10loginbonus SET day = day + 1, boolean = 'true';")
             }
-            val l = config.getStringList("data")
-            for (i in l){
-                val d = i.split(":")[0] + ":" + (i.split(":")[1].toInt() + 1) + ":true"
-                l.remove(i)
-                l.add(d)
-                config.set("data",l)
-            }
-            saveConfig()
+            mysql.close()
             server.logger.info("ログインボーナスの更新が完了しました")
-
             Bukkit.broadcastMessage(prefix + "ログインボーナスが更新されました！")
             Bukkit.broadcastMessage(prefix + "入りなおすと取得することができます")
             Bukkit.broadcastMessage(prefix + "ログインボーナスは/mlb showで見ることができます")
         },nexttime.toLong())
+
     }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (sender !is Player)return true
         if (args.isEmpty())return true
+        if (!mode){
+            sender.sendMessage(prefix + "は現在未稼働中です！")
+            return true
+        }
         when(args[0]){
             "help"->{
                 sender.sendMessage("§b===============Man10LoginBonus===============")
@@ -217,45 +225,46 @@ class MLB : JavaPlugin(), Listener {
 
     @EventHandler
     fun join(e : PlayerJoinEvent){
-        val l = config.getStringList("data")
-        if (l.find { it.contains("${e.player.uniqueId}") } == null) {
-            l.add("${e.player.uniqueId}:0:true")
-            config.set("data", l)
-            saveConfig()
-        }
-        val find = l.find { it.contains("${e.player.uniqueId}") }!!
-        val int = find.split(":")[1].toInt()
-        if (!find.split(":")[2].toBoolean())return
-        if (int > 24)return
-        val month = ZonedDateTime.now().monthValue
-        val file = File(dataFolder,"$month.yml")
-        if (!file.exists()){
-            e.player.sendMessage(prefix + "LoginBonusファイルを取得できませんでした")
-            e.player.sendMessage(prefix + "運営にお問い合わせください")
-            return
-        }
-        val con = YamlConfiguration.loadConfiguration(file)
-        val list = con.getStringList("login")
-        e.player.sendMessage("${e.player.inventory.contents.size}")
-        if (e.player.inventory.firstEmpty() == -1){
-            e.player.sendMessage(prefix + "インベントリの空きがありません！")
-            e.player.sendMessage(prefix + "インベントリを空けてから入りなおしてください")
-            return
-        }
-        var c = 0
-        while (c != e.player.inventory.size){
-            if (e.player.inventory.getItem(c)?.type == Material.AIR || e.player.inventory.getItem(c) == null){
-                e.player.inventory.setItem(c,itemFromBase64(list[find.split(":")[1].toInt()]))
-                break
+        if (!mode)return
+        pool.execute {
+            val mysql = MySQLManager(this,"mlbjoin")
+            var rs = mysql.query("SELECT * FROM man10loginbonus WHERE UUID = '${e.player.uniqueId}';")
+            if (!rs?.next()!!){
+                mysql.execute("INSERT INTO man10loginbonus (UUID, day, boolean) VALUES ('${e.player.uniqueId}', 0, 'true');")
+                rs = mysql.query("SELECT * FROM man10loginbonus WHERE UUID = '${e.player.uniqueId}';")
             }
-            c++
+            if (!rs?.getBoolean("boolean")!!)return@execute
+            val day = rs?.getInt("day")!!
+            if (day > 24)return@execute
+            rs.close()
+
+            val month = ZonedDateTime.now().monthValue
+            val file = File(dataFolder,"$month.yml")
+            if (!file.exists()){
+                e.player.sendMessage(prefix + "LoginBonusファイルを取得できませんでした")
+                e.player.sendMessage(prefix + "運営にお問い合わせください")
+                return@execute
+            }
+            val con = YamlConfiguration.loadConfiguration(file)
+            val list = con.getStringList("login")
+            if (e.player.inventory.firstEmpty() == -1){
+                e.player.sendMessage(prefix + "インベントリの空きがありません！")
+                e.player.sendMessage(prefix + "インベントリを空けてから入りなおしてください")
+                return@execute
+            }
+            var c = 0
+            while (c != e.player.inventory.size){
+                if (e.player.inventory.getItem(c)?.type == Material.AIR || e.player.inventory.getItem(c) == null){
+                    mysql.execute("UPDATE man10loginbonus SET boolean = 'false' WHERE UUID = '${e.player.uniqueId}';")
+                    e.player.inventory.setItem(c,itemFromBase64(list[day]))
+                    e.player.sendMessage(prefix + "今日のログインボーナス${itemFromBase64(list[day])?.itemMeta?.displayName}を受け取りました！")
+                    break
+                }
+                c++
+            }
+            mysql.close()
+            return@execute
         }
-        l.remove(find)
-        l.add("${e.player.uniqueId}:$int:false")
-        config.set("data",l)
-        saveConfig()
-        e.player.sendMessage(prefix + "今日のログインボーナス${itemFromBase64(list[find.split(":")[1].toInt()])?.itemMeta?.displayName}を受け取りました！")
-        return
     }
 
 
