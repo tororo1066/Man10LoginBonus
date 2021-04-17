@@ -14,6 +14,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.util.io.BukkitObjectInputStream
 import org.bukkit.util.io.BukkitObjectOutputStream
 import org.yaml.snakeyaml.external.biz.base64Coder.Base64Coder
@@ -245,25 +246,31 @@ class MLB : JavaPlugin(), Listener {
                 e.player.sendMessage(prefix + "運営にお問い合わせください")
                 return@execute
             }
-            val con = YamlConfiguration.loadConfiguration(file)
-            val list = con.getStringList("login")
-            if (e.player.inventory.firstEmpty() == -1){
-                e.player.sendMessage(prefix + "インベントリの空きがありません！")
-                e.player.sendMessage(prefix + "インベントリを空けてから入りなおしてください")
-                return@execute
-            }
-            var c = 0
-            while (c != e.player.inventory.size){
-                if (e.player.inventory.getItem(c)?.type == Material.AIR || e.player.inventory.getItem(c) == null){
-                    mysql.execute("UPDATE man10loginbonus SET boolean = 'false' WHERE UUID = '${e.player.uniqueId}';")
-                    e.player.inventory.setItem(c,itemFromBase64(list[day]))
-                    e.player.sendMessage(prefix + "今日のログインボーナス${itemFromBase64(list[day])?.itemMeta?.displayName}を受け取りました！")
-                    break
+            e.player.sendMessage(prefix + "ログインボーナスを受け取っています...")
+            object : BukkitRunnable(){
+                override fun run() {
+                    val con = YamlConfiguration.loadConfiguration(file)
+                    val list = con.getStringList("login")
+                    if (e.player.inventory.firstEmpty() == -1){
+                        e.player.sendMessage(prefix + "インベントリの空きがありません！")
+                        e.player.sendMessage(prefix + "インベントリを空けてから入りなおしてください")
+                        return
+                    }
+                    var c = 0
+                    while (c != e.player.inventory.size){
+                        if (e.player.inventory.getItem(c)?.type == Material.AIR || e.player.inventory.getItem(c) == null){
+                            mysql.execute("UPDATE man10loginbonus SET boolean = 'false' WHERE UUID = '${e.player.uniqueId}';")
+                            e.player.inventory.setItem(c,itemFromBase64(list[day]))
+                            e.player.sendMessage(prefix + "今日のログインボーナス${itemFromBase64(list[day])?.itemMeta?.displayName}を受け取りました！")
+                            break
+                        }
+                        c++
+                    }
+                    mysql.close()
+                    return
                 }
-                c++
-            }
-            mysql.close()
-            return@execute
+            }.runTaskLater(this,100)
+
         }
     }
 
