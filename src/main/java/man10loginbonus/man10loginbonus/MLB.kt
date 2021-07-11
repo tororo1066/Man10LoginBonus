@@ -44,11 +44,14 @@ class MLB : JavaPlugin(), Listener {
             return
         }else {
             mode = true
-            sql.execute("CREATE TABLE `man10loginbonus` IF NOT EXISTS(\n" +
-                    "  `UUID` varchar(36) DEFAULT NULL,\n" +
-                    "  `day` int DEFAULT NULL,\n" +
-                    "  `boolean` varchar(5) DEFAULT NULL\n" +
-                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci")
+            sql.execute("CREATE TABLE IF NOT EXISTS `man10loginbonus` (\n" +
+                    "\t`UUID` VARCHAR(36) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',\n" +
+                    "\t`day` INT(10) NULL DEFAULT NULL,\n" +
+                    "\t`boolean` VARCHAR(5) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci'\n" +
+                    ")\n" +
+                    "COLLATE='utf8mb4_0900_ai_ci'\n" +
+                    "ENGINE=InnoDB\n" +
+                    ";")
         }
         sql.close()
         server.logger.info("Man10LoginBonus is Enable!")
