@@ -239,13 +239,16 @@ class MLB : JavaPlugin(), Listener {
         if (!mode)return
         pool.execute {
             val mysql = MySQLManager(this,"mlbjoin")
-            var rs = mysql.query("SELECT * FROM man10loginbonus WHERE UUID = '${e.player.uniqueId}';")
+            val rs = mysql.query("SELECT * FROM man10loginbonus WHERE UUID = '${e.player.uniqueId}';")
             if (!rs?.next()!!){
                 mysql.execute("INSERT INTO man10loginbonus (UUID, day, boolean) VALUES ('${e.player.uniqueId}', 0, 'true');")
-                rs = mysql.query("SELECT * FROM man10loginbonus WHERE UUID = '${e.player.uniqueId}';")
+                rs.close()
+                mysql.close()
+                join(e)
+                return@execute
             }
-            if (!rs?.getBoolean("boolean")!!)return@execute
-            val day = rs?.getInt("day")!!
+            if (!rs.getBoolean("boolean"))return@execute
+            val day = rs.getInt("day")
             if (day > 24)return@execute
             rs.close()
 
@@ -266,16 +269,9 @@ class MLB : JavaPlugin(), Listener {
                         e.player.sendMessage(prefix + "インベントリを空けてから入りなおしてください")
                         return
                     }
-                    var c = 0
-                    while (c != e.player.inventory.size){
-                        if (e.player.inventory.getItem(c)?.type == Material.AIR || e.player.inventory.getItem(c) == null){
-                            mysql.execute("UPDATE man10loginbonus SET boolean = 'false', day = day + 1 WHERE UUID = '${e.player.uniqueId}';")
-                            e.player.inventory.setItem(c,itemFromBase64(list[day]))
-                            e.player.sendMessage(prefix + "今日のログインボーナス${itemFromBase64(list[day])?.itemMeta?.displayName}を受け取りました！")
-                            break
-                        }
-                        c++
-                    }
+                    mysql.execute("UPDATE man10loginbonus SET boolean = 'false', day = day + 1 WHERE UUID = '${e.player.uniqueId}';")
+                    itemFromBase64(list[day]!!)?.let { e.player.world.dropItemNaturally(e.player.location, it) }
+                    e.player.sendMessage(prefix + "今日のログインボーナス${itemFromBase64(list[day])?.itemMeta?.displayName}を受け取りました！")
                     mysql.close()
                     return
                 }
