@@ -42,7 +42,14 @@ class MLB : JavaPlugin(), Listener {
             server.logger.warning(prefix + "mysqlに接続できなかったのでpluginを停止しました")
             mode = false
             return
-        }else mode = true
+        }else {
+            mode = true
+            sql.execute("CREATE TABLE `man10loginbonus` IF NOT EXISTS(\n" +
+                    "  `UUID` varchar(36) DEFAULT NULL,\n" +
+                    "  `day` int DEFAULT NULL,\n" +
+                    "  `boolean` varchar(5) DEFAULT NULL\n" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci")
+        }
         sql.close()
         server.logger.info("Man10LoginBonus is Enable!")
         pool = Executors.newCachedThreadPool()
@@ -55,7 +62,7 @@ class MLB : JavaPlugin(), Listener {
             if (monthed != month){
                 mysql.execute("UPDATE man10loginbonus SET day = 0, boolean = 'true';")
             }else{
-                mysql.execute("UPDATE man10loginbonus SET day = day + 1, boolean = 'true';")
+                mysql.execute("UPDATE man10loginbonus SET boolean = 'true';")
             }
             mysql.close()
             server.logger.info("ログインボーナスの更新が完了しました")
@@ -259,7 +266,7 @@ class MLB : JavaPlugin(), Listener {
                     var c = 0
                     while (c != e.player.inventory.size){
                         if (e.player.inventory.getItem(c)?.type == Material.AIR || e.player.inventory.getItem(c) == null){
-                            mysql.execute("UPDATE man10loginbonus SET boolean = 'false' WHERE UUID = '${e.player.uniqueId}';")
+                            mysql.execute("UPDATE man10loginbonus SET boolean = 'false', day = day + 1 WHERE UUID = '${e.player.uniqueId}';")
                             e.player.inventory.setItem(c,itemFromBase64(list[day]))
                             e.player.sendMessage(prefix + "今日のログインボーナス${itemFromBase64(list[day])?.itemMeta?.displayName}を受け取りました！")
                             break
